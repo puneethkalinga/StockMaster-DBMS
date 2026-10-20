@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory & Warehouse Management System</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Sub navigation tab styling for the Orders view */
+        .sub-nav-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 12px;
+        }
+        .sub-tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        .sub-tab-btn:hover {
+            color: var(--text-white);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .sub-tab-btn.active {
+            color: var(--accent-cyan);
+            background: var(--primary-glow);
+            box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.1);
+        }
+        .sub-view-section {
+            display: none;
+        }
+        .sub-view-section.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- ============================================================
+         DEDICATED LOGIN GATEWAY (ADMIN & STAFF SEPARATE PORTALS)
+         ============================================================ -->
+    <div id="login-gateway-view" class="login-gateway-overlay">
+        <div class="login-card glass-panel">
+            <div class="login-header">
+                <div class="login-logo">
+                    <i data-lucide="boxes" style="width: 32px; height: 32px; color: var(--primary);"></i>
+                </div>
+                <h1 class="login-title">STOCK MASTER</h1>
+                <p class="login-subtitle">Enterprise Multi-Warehouse Inventory & Supply Chain Management</p>
+            </div>
+
+            <!-- Portal Tabs Switcher -->
+            <div class="portal-tabs">
+                <button type="button" class="portal-tab-btn active admin-tab" id="tab-admin-portal" onclick="switchLoginPortal('Admin')">
+                    <i data-lucide="shield" style="width: 18px; height: 18px; color: var(--primary);"></i>
+                    <div>
+                        <span class="tab-title">System Administrator</span>
+                        <span class="tab-role-tag">Executive Access</span>
+                    </div>
+                </button>
+                <button type="button" class="portal-tab-btn staff-tab" id="tab-staff-portal" onclick="switchLoginPortal('Warehouse Staff')">
+                    <i data-lucide="user" style="width: 18px; height: 18px; color: var(--amber);"></i>
+                    <div>
+                        <span class="tab-title">Warehouse Staff</span>
+                        <span class="tab-role-tag">Operations Access</span>
+                    </div>
+                </button>
+            </div>
+
+            <!-- 1. Administrator Portal Form -->
+            <div id="portal-form-admin" class="portal-form-container">
+                <div class="portal-badge-banner admin-banner">
+                    <div class="banner-icon"><i data-lucide="shield-check"></i></div>
+                    <div>
+                        <strong style="color: var(--primary); font-size: 13px;">Administrator Security Gateway</strong>
+                        <p style="margin: 2px 0 0; font-size: 11px; color: var(--text-muted);">
+                            Executive privileges: SKU cataloging, warehouse depot sizing, financial ledgers, and audit exports.
+                        </p>
+                    </div>
+                </div>
+
+                <form id="form-login-admin" onsubmit="submitPortalLogin(event, 'Admin')">
+                    <div class="form-group">
+                        <label style="font-size: 12px; color: var(--text-gray); margin-bottom: 6px; display: block;">Administrator Email or Username</label>
+                        <div class="input-with-icon">
+                            <i data-lucide="mail"></i>
+                            <input type="text" id="admin-login-email" class="form-control" placeholder="Enter admin email or username" required autocomplete="username">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 14px;">
+                        <label style="font-size: 12px; color: var(--text-gray); margin-bottom: 6px; display: block;">Administrator Password</label>
+                        <div class="input-with-icon">
+                            <i data-lucide="lock"></i>
+                            <input type="password" id="admin-login-password" class="form-control" placeholder="Enter password" required autocomplete="current-password">
+                        </div>
+                    </div>
+                    <div id="admin-login-error" class="login-error-msg" style="display:none;"></div>
+                    <button type="submit" class="btn btn-primary login-submit-btn" style="width:100%; margin-top:20px;">
+                        <i data-lucide="log-in"></i> Sign In to Administrator Portal
+                    </button>
+                </form>
+            </div>
+
+            <!-- 2. Warehouse Staff Portal Form -->
+            <div id="portal-form-staff" class="portal-form-container" style="display: none;">
+                <div class="portal-badge-banner staff-banner">
+                    <div class="banner-icon"><i data-lucide="package-check"></i></div>
+                    <div>
+                        <strong style="color: var(--amber); font-size: 13px;">Warehouse Operations Gateway</strong>
+                        <p style="margin: 2px 0 0; font-size: 11px; color: var(--text-muted);">
+                            Operational specialist privileges: Live depot stock levels, inbound PO receiving, and carrier fulfillment.
+                        </p>
+                    </div>
+                </div>
+
+                <form id="form-login-staff" onsubmit="submitPortalLogin(event, 'Warehouse Staff')">
+                    <div class="form-group">
+                        <label style="font-size: 12px; color: var(--text-gray); margin-bottom: 6px; display: block;">Staff Email or Username</label>
+                        <div class="input-with-icon">
+                            <i data-lucide="mail"></i>
+                            <input type="text" id="staff-login-email" class="form-control" placeholder="Enter staff email or username" required autocomplete="username">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 14px;">
+                        <label style="font-size: 12px; color: var(--text-gray); margin-bottom: 6px; display: block;">Staff Password</label>
+                        <div class="input-with-icon">
+                            <i data-lucide="lock"></i>
+                            <input type="password" id="staff-login-password" class="form-control" placeholder="Enter password" required autocomplete="current-password">
+                        </div>
+                    </div>
+                    <div id="staff-login-error" class="login-error-msg" style="display:none;"></div>
+                    <button type="submit" class="btn btn-amber login-submit-btn" style="width:100%; margin-top:20px;">
+                        <i data-lucide="log-in"></i> Sign In to Staff Portal
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container" id="main-app-container" style="display: none;">
+        
+        <!-- ============================================================
+             SIDEBAR NAVIGATION PANEL
+             ============================================================ -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <i data-lucide="boxes"></i>
+                </div>
+                <span class="logo-text">STOCK MASTER</span>
+            </div>
+            
+            <nav class="nav-list">
+                <li class="nav-item active" data-view="dashboard">
+                    <a href="#dashboard"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+                </li>
+                <li class="nav-item" data-view="products">
+                    <a href="#products"><i data-lucide="package"></i> Products Catalog</a>
+                </li>
+                <li class="nav-item" data-view="inventory">
+                    <a href="#inventory"><i data-lucide="boxes"></i> Inventory Stock</a>
+                </li>
+                <li class="nav-item" data-view="orders">
+                    <a href="#orders"><i data-lucide="shopping-cart"></i> Orders & Ledger</a>
+                </li>
+                <li class="nav-item" data-view="reports">
+                    <a href="#reports"><i data-lucide="file-text"></i> Reports Summary</a>
+                </li>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile-badge" id="user-profile-btn" style="padding: 10px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);">
+                    <div class="profile-avatar" id="current-user-avatar">PK</div>
+                    <div class="profile-info" style="flex: 1;">
+                        <span class="profile-name" id="current-user-name" style="font-weight: 600; font-size: 13px; color: var(--text-white);">Puneeth Kumar</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span class="badge badge-green" id="current-user-role-badge" style="font-size: 10px; padding: 2px 6px;">System Admin</span>
+                        </div>
+                    </div>
+                    <i data-lucide="user-check" style="width:16px; height:16px; color: var(--accent-cyan);"></i>
+                </div>
+                <button type="button" class="btn btn-danger btn-small" id="sidebar-logout-btn" onclick="handleLogout()" style="width:100%; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:6px; font-size:11px;">
+                    <i data-lucide="log-out" style="width:13px; height:13px;"></i> Log Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- ============================================================
+             MAIN CONTENT VIEWPORT
+             ============================================================ -->
+        <main class="main-content">
+            
+            <!-- Page Header -->
+            <header class="view-header">
+                <div class="view-title-container">
+                    <h1 id="page-title">Dashboard</h1>
+                    <p id="page-subtitle">Central hub for warehouse statistics, stock levels, and ledger financials.</p>
+                </div>
+                <div class="header-actions">
+                    <select id="global-warehouse-filter" class="project-select-dropdown">
+                        <option value="all">All Warehouses</option>
+                    </select>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="secondary-action-btn" class="btn btn-secondary">
+                            Add Supplier
+                        </button>
+                        <button id="primary-action-btn" class="btn btn-primary">
+                            <i data-lucide="plus"></i> Add Product
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Low-Stock Alerts Banner -->
+            <div class="alert-banner" id="low-stock-banner" style="display: none;">
+                <div class="alert-message" id="low-stock-banner-message">
+                    <i data-lucide="alert-triangle" style="width: 14px; vertical-align: middle; margin-right: 6px; color: var(--error);"></i>
+                    Warning: Items are running below minimum stock alert thresholds!
+                </div>
+                <button class="btn btn-danger btn-small" onclick="navigateTo('inventory-low')">Verify Stock</button>
+            </div>
+
+            <!-- ============================================================
+                 ROUTE VIEWS (TOGGLED BY JS)
+                 ============================================================ -->
+
+            <!-- 1. DASHBOARD VIEW -->
+            <section id="dashboard-view" class="view-section active">
+                <div class="kpi-grid">
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-info">
+                            <h3>Active Warehouses</h3>
+                            <span class="kpi-value" id="kpi-warehouses">0</span>
+                        </div>
+                        <div class="kpi-icon-container kpi-purple"><i data-lucide="warehouse"></i></div>
+                    </div>
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-info">
+                            <h3>Products Cataloged</h3>
+                            <span class="kpi-value" id="kpi-products">0</span>
+                        </div>
+                        <div class="kpi-icon-container kpi-blue"><i data-lucide="package"></i></div>
+                    </div>
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-info">
+                            <h3>Total Stock Items</h3>
+                            <span class="kpi-value" id="kpi-stock">0</span>
+                        </div>
+                        <div class="kpi-icon-container kpi-green"><i data-lucide="boxes"></i></div>
+                    </div>
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-info">
+                            <h3>Active Shipments</h3>
+                            <span class="kpi-value" id="kpi-shipments">0</span>
+                        </div>
+                        <div class="kpi-icon-container kpi-amber"><i data-lucide="truck"></i></div>
+                    </div>
+                </div>
+
+                <div class="quick-actions-bar" style="margin-top: 24px; margin-bottom: 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                    <div class="glass-panel action-card" onclick="openModal('product')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:16px; border-radius:12px; border:1px solid var(--glass-border);">
+                        <div class="action-icon" style="background:var(--primary-glow); color:var(--primary); padding:10px; border-radius:8px; display:flex; align-items:center;"><i data-lucide="plus-circle" style="width:20px; height:20px;"></i></div>
+                        <div>
+                            <h4 style="margin:0; font-size:14px; font-weight:600; color:var(--text-white);">Register New SKU</h4>
+                            <p style="margin:0; font-size:11px; color:var(--text-muted);">Add new product specifications.</p>
+                        </div>
+                    </div>
+                    <div class="glass-panel action-card" onclick="openModal('po')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:16px; border-radius:12px; border:1px solid var(--glass-border);">
+                        <div class="action-icon" style="background:var(--amber-glow); color:var(--amber); padding:10px; border-radius:8px; display:flex; align-items:center;"><i data-lucide="shopping-cart" style="width:20px; height:20px;"></i></div>
+                        <div>
+                            <h4 style="margin:0; font-size:14px; font-weight:600; color:var(--text-white);">Raise Purchase Order</h4>
+                            <p style="margin:0; font-size:11px; color:var(--text-muted);">Restock inventory items from suppliers.</p>
+                        </div>
+                    </div>
+                    <div class="glass-panel action-card" onclick="openModal('so')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:16px; border-radius:12px; border:1px solid var(--glass-border);">
+                        <div class="action-icon" style="background:var(--accent-cyan-glow); color:var(--accent-cyan); padding:10px; border-radius:8px; display:flex; align-items:center;"><i data-lucide="arrow-up-right" style="width:20px; height:20px;"></i></div>
+                        <div>
+                            <h4 style="margin:0; font-size:14px; font-weight:600; color:var(--text-white);">Log Customer Sale</h4>
+                            <p style="margin:0; font-size:11px; color:var(--text-muted);">Dispatch sold goods out of warehouse.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-columns">
+                    <!-- Column 1: Capacity occupancy charts -->
+                    <div class="glass-panel section-card">
+                        <h2>Warehouse Storage Capacity</h2>
+                        <p class="card-body-text" style="margin-bottom:0;">Live occupancy statistics comparing current stock against warehouse capacities.</p>
+                        <div class="chart-container">
+                            <svg id="dashboard-capacity-chart" class="chart-svg"></svg>
+                        </div>
+                    </div>
+                    
+                    <!-- Column 2: Financial Aggregates & Union logs -->
+                    <div class="glass-panel section-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+                        <div>
+                            <h2>Financial Aggregates</h2>
+                            <div style="display:flex; justify-content:space-between; margin:15px 0; border-bottom:1px solid var(--glass-border); padding-bottom:10px;">
+                                <div><span style="font-size:11px; color:var(--text-muted);">TOTAL REVENUE</span><h3 id="finance-income" style="color:var(--success); font-size:18px;">₹0.00</h3></div>
+                                <div><span style="font-size:11px; color:var(--text-muted);">TOTAL SPEND</span><h3 id="finance-expense" style="color:var(--error); font-size:18px;">₹0.00</h3></div>
+                                <div><span style="font-size:11px; color:var(--text-muted);">NET PROFIT</span><h3 id="finance-net" style="color:var(--accent-cyan); font-size:18px;">₹0.00</h3></div>
+                            </div>
+                        </div>
+                        <div>
+                            <h2>Operations & Database Log</h2>
+                            <ul class="activity-list" id="activity-feed-list">
+                                <!-- Dynamic Union SQL logs -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Demand Forecasting & Predictive Restocking Panel -->
+                <div class="glass-panel section-card" style="margin-top: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span class="badge badge-cyan" style="font-size:10px; font-weight:700;">REVIEW 2 ANALYTICS</span>
+                                <h2 style="margin:0;"><i data-lucide="trending-up" style="vertical-align: middle; color: var(--accent-cyan); width: 20px; height: 20px; margin-right: 6px;"></i>Smart Demand Forecasting & Restock Engine</h2>
+                            </div>
+                            <p class="card-body-text" style="margin-bottom:0; margin-top:4px;">Predictive sales run-rate velocity modeling and automated stockout prevention buffer calculations.</p>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-secondary btn-small" onclick="exportCSV('forecasting')"><i data-lucide="download"></i> Export Forecast CSV</button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="dbms-table">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Category</th>
+                                    <th>Total Stock</th>
+                                    <th>Daily Burn Rate</th>
+                                    <th>Days Left</th>
+                                    <th>Stockout Risk</th>
+                                    <th>Suggested Restock</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="forecasting-table-body">
+                                <tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Analyzing sales trends...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. PRODUCTS VIEW -->
+            <section id="products-view" class="view-section">
+                <div class="glass-panel section-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                        <h2>Registered Products Catalog</h2>
+                        <button class="btn btn-secondary btn-small" onclick="exportCSV('products')"><i data-lucide="download"></i> Export Products CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="dbms-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Product Name</th>
+                                    <th>Category</th>
+                                    <th>Price</th>
+                                    <th>Supplier Name</th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. INVENTORY VIEW -->
+            <section id="inventory-view" class="view-section">
+                <div class="glass-panel section-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                        <h2>Warehouse Stock Levels (Real-Time Inventory Table)</h2>
+                        <button class="btn btn-secondary btn-small" onclick="exportCSV('inventory')"><i data-lucide="download"></i> Export Inventory CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="dbms-table">
+                            <thead>
+                                <tr>
+                                    <th>Warehouse Location</th>
+                                    <th>Product Name</th>
+                                    <th>Category</th>
+                                    <th>Current Quantity</th>
+                                    <th>Price</th>
+                                    <th>Status (Min Threshold check)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. ORDERS & LEDGER VIEW (WITH SUB TABS) -->
+            <section id="orders-view" class="view-section">
+                <div class="sub-nav-tabs">
+                    <button class="sub-tab-btn active" data-sub-view="purchase">Purchase Orders</button>
+                    <button class="sub-tab-btn" data-sub-view="sales">Sales Orders</button>
+                    <button class="sub-tab-btn" data-sub-view="shipments">Logistics Shipments</button>
+                    <button class="sub-tab-btn" data-sub-view="billing">Billing Ledger</button>
+                </div>
+
+                <!-- PO Sub-View -->
+                <div class="sub-view-section active" id="subview-purchase">
+                    <div class="glass-panel section-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                            <h2>Supply Purchase Orders (PO)</h2>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-secondary btn-small" onclick="exportCSV('orders')"><i data-lucide="download"></i> Export CSV</button>
+                                <button class="btn btn-primary btn-small" onclick="openModal('po')"><i data-lucide="plus"></i> Add PO</button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="dbms-table">
+                                <thead>
+                                    <tr>
+                                        <th>PO ID</th>
+                                        <th>Supplier Name</th>
+                                        <th>Product Name</th>
+                                        <th>Destination Warehouse</th>
+                                        <th>Qty</th>
+                                        <th>Total Cost</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="po-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sales Sub-View -->
+                <div class="sub-view-section" id="subview-sales">
+                    <div class="glass-panel section-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                            <h2>Customer Sales Orders (SO)</h2>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-secondary btn-small" onclick="exportCSV('orders')"><i data-lucide="download"></i> Export CSV</button>
+                                <button class="btn btn-primary btn-small" onclick="openModal('so')"><i data-lucide="plus"></i> Place Sale</button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="dbms-table">
+                                <thead>
+                                    <tr>
+                                        <th>SO ID</th>
+                                        <th>Customer Name</th>
+                                        <th>Product Name</th>
+                                        <th>Source Warehouse</th>
+                                        <th>Qty</th>
+                                        <th>Total Price</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sales-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Shipments Sub-View -->
+                <div class="sub-view-section" id="subview-shipments">
+                    <div class="glass-panel section-card">
+                        <h2>Carrier Shipments Tracking</h2>
+                        <div class="table-container">
+                            <table class="dbms-table">
+                                <thead>
+                                    <tr>
+                                        <th>Shipment ID</th>
+                                        <th>Sales Order ID</th>
+                                        <th>Warehouse Depot</th>
+                                        <th>Shipment Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="shipments-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Billing Sub-View -->
+                <div class="sub-view-section" id="subview-billing">
+                    <div class="glass-panel section-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                            <h2>Accounts Billing & Ledgers</h2>
+                            <button class="btn btn-secondary btn-small" onclick="exportCSV('billing')"><i data-lucide="download"></i> Export Ledger CSV</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="dbms-table">
+                                <thead>
+                                    <tr>
+                                        <th>Bill ID</th>
+                                        <th>Sales Order ID</th>
+                                        <th>Customer Name</th>
+                                        <th>Amount Due</th>
+                                        <th>Payment Mode</th>
+                                        <th>Payment Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="billing-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. PRINTABLE REPORT VIEW -->
+            <section id="reports-view" class="view-section">
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+                    <button class="btn btn-secondary btn-small" onclick="exportCSV('inventory')"><i data-lucide="download"></i> Export Inventory CSV</button>
+                    <button class="btn btn-secondary btn-small" onclick="exportCSV('forecasting')"><i data-lucide="trending-up"></i> Export Forecast CSV</button>
+                    <button class="btn btn-secondary btn-small" onclick="exportCSV('orders')"><i data-lucide="shopping-cart"></i> Export Orders CSV</button>
+                    <button class="btn btn-primary btn-small" onclick="window.print()"><i data-lucide="printer"></i> Print Audit PDF</button>
+                </div>
+                <div class="glass-panel section-card" id="report-print-container">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 20px;">
+                        <div>
+                            <h2 style="font-size: 24px;">Warehouse Operations & Inventory Audit</h2>
+                            <p style="color: var(--text-gray); font-size:12px; margin-top:5px;">Database Management System • 9-Table Relational Schema Audit</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="font-weight: 700; color: var(--accent-cyan);">STOCK MASTER v1.0</span>
+                            <p style="font-size:11px; color: var(--text-muted); margin-top:5px;" id="report-date-string"></p>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 20px;">
+                        <div>
+                            <h3 style="margin-bottom: 12px; font-size: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom:6px;">Inventory Metrics Summary</h3>
+                            <table style="width:100%; font-size:13px; border-collapse: collapse;">
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding:10px 0; color:var(--text-gray);">Total Warehouses</td><td style="text-align:right; font-weight:600;" id="report-wh-count">0</td></tr>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding:10px 0; color:var(--text-gray);">Total Product SKUs</td><td style="text-align:right; font-weight:600;" id="report-prod-count">0</td></tr>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding:10px 0; color:var(--text-gray);">Supplier Entities</td><td style="text-align:right; font-weight:600;" id="report-supp-count">0</td></tr>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding:10px 0; color:var(--text-gray);">Total Items in Stock</td><td style="text-align:right; font-weight:600; color:var(--accent-cyan);" id="report-stock-sum">0</td></tr>
+                                <tr><td style="padding:10px 0; color:var(--text-gray);">Low-Stock Warnings Count</td><td style="text-align:right; font-weight:600; color:var(--error);" id="report-warnings-count">0</td></tr>
+                            </table>
+                        </div>
+                        <div>
+                            <h3 style="margin-bottom: 12px; font-size: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom:6px;">Financial Account Balances</h3>
+                            <table style="width:100%; font-size:13px; border-collapse: collapse;">
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding:10px 0; color:var(--text-gray);">Total Sales Revenues</td><td style="text-align:right; font-weight:600; color:var(--success);" id="report-revenue-sum">₹0.00</td></tr>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);"><td style="padding:10px 0; color:var(--text-gray);">Total Purchase Spend</td><td style="text-align:right; font-weight:600; color:var(--error);" id="report-expense-sum">₹0.00</td></tr>
+                                <tr><td style="padding:10px 0; color:var(--text-gray);">Net Cash balance</td><td style="text-align:right; font-weight:600;" id="report-net-balance">₹0.00</td></tr>
+                            </table>
+                            <div class="glass-card" style="margin-top: 18px; padding: 12px; border-color: var(--primary-glow); font-size:11px; line-height:1.4;">
+                                <span style="font-weight:700; color:var(--accent-cyan);">Relational DDL Integrity Schema</span>
+                                <p style="color:var(--text-gray); margin-top:2px;">Referential Integrity constraints are active. Indexes speed up joins for products and warehouses.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 32px;">
+                        <h3 style="margin-bottom: 16px; font-size: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom:6px;">Warehouse Capacity Utilization Summary</h3>
+                        <table style="width:100%; border-collapse: collapse; font-size:12px;" class="dbms-table">
+                            <thead>
+                                <tr>
+                                    <th style="padding:10px;">Warehouse</th>
+                                    <th style="padding:10px; text-align:right;">Max SqFt Limit</th>
+                                    <th style="padding:10px; text-align:right;">Current Items Stock</th>
+                                    <th style="padding:10px; text-align:right;">Occupancy Ratio (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-warehouse-summary-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ============================================================
+         POPUP INPUT MODALS
+         ============================================================ -->
+
+    <!-- 1. CREATE WAREHOUSE MODAL -->
+    <div class="modal-overlay" id="modal-warehouse">
+        <div class="glass-panel modal-box">
+            <div class="modal-header">
+                <h2 class="modal-title">Setup Warehouse Facility</h2>
+                <button class="modal-close" data-close="warehouse">&times;</button>
+            </div>
+            <form id="form-warehouse">
+                <div class="form-grid">
+                    <div class="form-group form-full">
+                        <label>Warehouse Name</label>
+                        <input type="text" id="wh-name" class="form-control" placeholder="e.g. Bangalore North Annex" required>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Location Address</label>
+                        <input type="text" id="wh-location" class="form-control" placeholder="e.g. Yelahanka Sector 5, Bangalore" required>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Capacity Limit (SqFt)</label>
+                        <input type="number" min="1000" id="wh-capacity" class="form-control" placeholder="e.g. 25000" required>
+                    </div>
+                    <div class="form-full" style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                        <button type="button" class="btn btn-secondary" data-close="warehouse">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save to Database</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. REGISTER PRODUCT MODAL -->
+    <div class="modal-overlay" id="modal-product">
+        <div class="glass-panel modal-box">
+            <div class="modal-header">
+                <h2 class="modal-title">Register Product SKU</h2>
+                <button class="modal-close" data-close="product">&times;</button>
+            </div>
+            <form id="form-product">
+                <div class="form-grid">
+                    <div class="form-group form-full">
+                        <label>Product Name</label>
+                        <input type="text" id="prod-name" class="form-control" placeholder="e.g. Core i9 Processor" required>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Select Supplier (FK)</label>
+                        <select id="prod-supplier" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <input type="text" id="prod-category" class="form-control" placeholder="e.g. Processor" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Retail Price (₹)</label>
+                        <input type="number" step="0.01" min="1" id="prod-price" class="form-control" placeholder="e.g. 45000" required>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Min Stock Threshold</label>
+                        <input type="number" min="0" id="prod-threshold" class="form-control" value="10" required>
+                    </div>
+                    <div class="form-full" style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                        <button type="button" class="btn btn-secondary" data-close="product">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add SKU</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. CREATE SUPPLIER MODAL -->
+    <div class="modal-overlay" id="modal-supplier">
+        <div class="glass-panel modal-box">
+            <div class="modal-header">
+                <h2 class="modal-title">Register Supplier Company</h2>
+                <button class="modal-close" data-close="supplier">&times;</button>
+            </div>
+            <form id="form-supplier">
+                <div class="form-grid">
+                    <div class="form-group form-full">
+                        <label>Supplier Company Name</label>
+                        <input type="text" id="supp-name" class="form-control" placeholder="e.g. Samsung Semiconductors" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Phone</label>
+                        <input type="text" id="supp-phone" class="form-control" placeholder="e.g. 9876543210" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Email (Unique Check)</label>
+                        <input type="email" id="supp-email" class="form-control" placeholder="e.g. order@samsung.com" required>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Supplier Office Address</label>
+                        <input type="text" id="supp-address" class="form-control" placeholder="e.g. Industrial Sector 4, Bangalore" required>
+                    </div>
+                    <div class="form-full" style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                        <button type="button" class="btn btn-secondary" data-close="supplier">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Supplier</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. LOG PURCHASE ORDER MODAL -->
+    <div class="modal-overlay" id="modal-po">
+        <div class="glass-panel modal-box">
+            <div class="modal-header">
+                <h2 class="modal-title">Raise Purchase Order (PO)</h2>
+                <button class="modal-close" data-close="po">&times;</button>
+            </div>
+            <form id="form-po">
+                <div class="form-grid">
+                    <div class="form-group form-full">
+                        <label>Select Supplier (FK)</label>
+                        <select id="po-supplier" class="form-control" required></select>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Select Product (FK)</label>
+                        <select id="po-product" class="form-control" required></select>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Destination Warehouse (FK)</label>
+                        <select id="po-warehouse" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" min="1" id="po-qty" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Total Supply Cost (₹)</label>
+                        <input type="number" step="0.01" min="1" id="po-cost" class="form-control" required>
+                    </div>
+                    <div class="form-full" style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                        <button type="button" class="btn btn-secondary" data-close="po">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Pending PO</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 5. PLACE SALES ORDER MODAL -->
+    <div class="modal-overlay" id="modal-so">
+        <div class="glass-panel modal-box">
+            <div class="modal-header">
+                <h2 class="modal-title">Log Customer Sale Dispatch (SO)</h2>
+                <button class="modal-close" data-close="so">&times;</button>
+            </div>
+            <form id="form-so">
+                <div class="form-grid">
+                    <div class="form-group form-full">
+                        <label>Customer Full Name</label>
+                        <input type="text" id="so-customer" class="form-control" placeholder="e.g. Tagur Misra" required>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Select Product (FK)</label>
+                        <select id="so-product" class="form-control" required></select>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Source Warehouse (FK)</label>
+                        <select id="so-warehouse" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" min="1" id="so-qty" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Total Price (₹)</label>
+                        <input type="number" step="0.01" min="1" id="so-price" class="form-control" required>
+                    </div>
+                    <div class="form-group form-full">
+                        <label>Payment Method</label>
+                        <select id="so-pay" class="form-control">
+                            <option value="Card">Credit/Debit Card</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cash">Cash on Delivery</option>
+                        </select>
+                    </div>
+                    <div class="form-full" style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                        <button type="button" class="btn btn-secondary" data-close="so">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Process Sale</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+
+    <!-- Interactivity scripts -->
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

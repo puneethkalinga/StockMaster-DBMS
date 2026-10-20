@@ -1,0 +1,28 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+env/
+
+# Office temporary lock files
+~$*
+*.tmp
+
+# Internal generator & maintenance scripts
+generate_*.py
+make_*.py
+dump_seed.py
+seed_*.py
+sql_terminal.py
+*.bak
+
+# Archives & redundant files
+*.zip
+B_G18_STOCKMASTER/
+B_18_STOCKMASTER/
+Screenshot*
+er_diagram_final.pdf
+stockmaster_chens_er_diagram*.png
+stockmaster_er_diagram.png
