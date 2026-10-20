@@ -13,6 +13,7 @@ env/
 # Internal generator & maintenance scripts
 generate_*.py
 make_*.py
+draw_*.py
 dump_seed.py
 seed_*.py
 sql_terminal.py
