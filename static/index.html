@@ -174,6 +174,9 @@
                 <li class="nav-item" data-view="reports">
                     <a href="#reports"><i data-lucide="file-text"></i> Reports Summary</a>
                 </li>
+                <li class="nav-item" data-view="sql-console">
+                    <a href="#sql-console"><i data-lucide="terminal"></i> Live SQL Console</a>
+                </li>
             </nav>
             
             <div class="sidebar-footer">
@@ -582,6 +585,68 @@
                     </div>
                 </div>
             </section>
+
+            <!-- ============================================================
+                 6. LIVE SQL QUERY CONSOLE (SPOT QUERY DEMO)
+                 ============================================================ -->
+            <section id="sql-console-view" class="view-section">
+                <div class="glass-panel" style="padding: 24px; margin-bottom: 20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                        <div>
+                            <h2 style="font-size:18px; font-weight:700; color:var(--text-white); margin-bottom:4px; display:flex; align-items:center; gap:8px;">
+                                <i data-lucide="terminal" style="color:var(--accent-cyan);"></i> Live Relational SQL Console
+                            </h2>
+                            <p style="font-size:12px; color:var(--text-muted); margin:0;">
+                                Execute live ad-hoc SQL queries directly against <code>inventory_system.db</code> (Enforced with <code>PRAGMA foreign_keys = ON</code>).
+                            </p>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-secondary btn-small" onclick="setSQLTemplate('4way')">4-Way Join</button>
+                            <button type="button" class="btn btn-secondary btn-small" onclick="setSQLTemplate('capacity')">Depot Capacity</button>
+                            <button type="button" class="btn btn-secondary btn-small" onclick="setSQLTemplate('alerts')">Low Stock View</button>
+                            <button type="button" class="btn btn-secondary btn-small" onclick="setSQLTemplate('deadstock')">Dead Stock Subquery</button>
+                            <button type="button" class="btn btn-secondary btn-small" onclick="setSQLTemplate('tables')">List Tables</button>
+                        </div>
+                    </div>
+
+                    <div style="position:relative;">
+                        <textarea id="sql-query-input" rows="5" class="form-control" style="font-family:Consolas, monospace; font-size:13px; line-height:1.5; background:#0b1120; border-color:#1e293b; color:#38bdf8; resize:vertical;" placeholder="Type ANY SQL query here (e.g. SELECT * FROM products LIMIT 10;)">SELECT p.ProductID, p.ProductName, p.Category, w.WarehouseName, i.Quantity, p.UnitPrice, (i.Quantity * p.UnitPrice) AS TotalValueINR FROM inventory i JOIN products p ON i.ProductID = p.ProductID JOIN warehouses w ON i.WarehouseID = w.WarehouseID WHERE i.Quantity > 0 ORDER BY TotalValueINR DESC LIMIT 10;</textarea>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px;">
+                        <span id="sql-status-indicator" style="font-size:12px; color:var(--text-muted);">
+                            Press <strong>Execute Query</strong> or <strong>Ctrl + Enter</strong> to run.
+                        </span>
+                        <div style="display:flex; gap:10px;">
+                            <button type="button" class="btn btn-secondary btn-small" onclick="clearSQLConsole()">Clear</button>
+                            <button type="button" class="btn btn-primary" id="btn-run-sql" onclick="runLiveSQLQuery()">
+                                <i data-lucide="play"></i> Execute Query
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Query Results Box -->
+                <div class="glass-panel" style="padding: 20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <h3 style="font-size:14px; font-weight:600; color:var(--text-white); margin:0;">
+                            Live Query Result Output
+                        </h3>
+                        <span id="sql-result-metrics" class="badge badge-gray" style="font-size:11px;">0 rows</span>
+                    </div>
+                    <div class="table-container" style="max-height: 480px; overflow-y: auto;">
+                        <table class="data-table" id="sql-results-table">
+                            <thead id="sql-results-thead">
+                                <tr><th>Result</th></tr>
+                            </thead>
+                            <tbody id="sql-results-tbody">
+                                <tr><td style="text-align:center; color:var(--text-muted); padding:30px;">Click 'Execute Query' above to view live database records.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
 
         </main>
     </div>

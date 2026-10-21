@@ -3,6 +3,7 @@ import db_manager
 import os
 import csv
 import io
+import time
 from datetime import datetime
 
 app = Flask(__name__, static_folder="static")
@@ -11,6 +12,48 @@ app.secret_key = "stockmaster_fresh_auth_session_v3"
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")
+
+# ====================================================================
+# LIVE SQL QUERY CONSOLE (REVIEW 2 VIVA SPOT EXECUTION)
+# ====================================================================
+
+@app.route("/api/sql/execute", methods=["POST"])
+def api_sql_execute():
+    data = request.json or {}
+    query = (data.get("sql") or "").strip()
+    if not query:
+        return jsonify({"error": "Empty query string. Please type an SQL query."}), 400
+    
+    conn = db_manager.get_db_connection()
+    conn.execute("PRAGMA foreign_keys = ON;")
+    cursor = conn.cursor()
+    start = time.time()
+    try:
+        cursor.execute(query)
+        if query.lower().startswith(("select", "pragma", "with", "explain")):
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description] if cursor.description else []
+            data_rows = [list(r) for r in rows]
+            elapsed = round((time.time() - start) * 1000, 2)
+            return jsonify({
+                "success": True,
+                "columns": columns,
+                "rows": data_rows,
+                "row_count": len(data_rows),
+                "elapsed_ms": elapsed
+            })
+        else:
+            conn.commit()
+            elapsed = round((time.time() - start) * 1000, 2)
+            return jsonify({
+                "success": True,
+                "columns": ["Status"],
+                "rows": [[f"Statement executed successfully. {cursor.rowcount} row(s) affected."]],
+                "row_count": cursor.rowcount,
+                "elapsed_ms": elapsed
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 # ====================================================================
 # REVIEW 2: AUTHENTICATION & ROLE-BASED ACCESS CONTROL (RBAC)

@@ -390,6 +390,12 @@ function updateHeader() {
         primaryActionBtn.innerHTML = `<i data-lucide="printer"></i> Print Summary`;
         primaryActionBtn.onclick = () => window.print();
         secondaryActionBtn.style.display = "none";
+    } else if (activeView === "sql-console") {
+        if (pageTitle) pageTitle.innerText = "Live Relational SQL Console";
+        if (pageSubtitle) pageSubtitle.innerText = "Execute ad-hoc SQL queries on the spot (PRAGMA foreign_keys = ON).";
+        primaryActionBtn.style.display = "none";
+        secondaryActionBtn.style.display = "none";
+        if (globalWarehouseFilter) globalWarehouseFilter.style.display = "none";
     }
     refreshIcons();
 }
@@ -463,6 +469,17 @@ function registerEvents() {
 
     const formSo = document.getElementById("form-so");
     if (formSo) formSo.addEventListener("submit", submitSO);
+
+    // 7. Live SQL Console shortcut (Ctrl + Enter)
+    const sqlArea = document.getElementById("sql-query-input");
+    if (sqlArea) {
+        sqlArea.addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                e.preventDefault();
+                runLiveSQLQuery();
+            }
+        });
+    }
 
 }
 
@@ -1054,5 +1071,146 @@ function submitSO(e) {
             loadSubView("sales");
             checkAlerts();
         }
+    });
+}
+
+// ====================================================================
+// LIVE SQL QUERY CONSOLE ENGINE
+// ====================================================================
+
+const SQL_TEMPLATES = {
+    "4way": `SELECT 
+    p.ProductID, p.ProductName, p.Category, w.WarehouseName, 
+    s.SupplierName, i.Quantity AS StockOnHand, p.UnitPrice, 
+    (i.Quantity * p.UnitPrice) AS TotalValueINR 
+FROM inventory i 
+INNER JOIN products p ON i.ProductID = p.ProductID 
+INNER JOIN warehouses w ON i.WarehouseID = w.WarehouseID 
+INNER JOIN suppliers s ON p.SupplierID = s.SupplierID 
+WHERE i.Quantity > 0 
+ORDER BY TotalValueINR DESC 
+LIMIT 10;`,
+
+    "capacity": `SELECT 
+    w.WarehouseID, w.WarehouseName, w.Location, w.Capacity,
+    COUNT(DISTINCT i.ProductID) AS DistinctProducts,
+    SUM(i.Quantity) AS TotalStockUnits,
+    ROUND((SUM(i.Quantity) * 100.0) / w.Capacity, 2) AS OccupancyPct
+FROM warehouses w
+INNER JOIN inventory i ON w.WarehouseID = i.WarehouseID
+GROUP BY w.WarehouseID, w.WarehouseName, w.Location, w.Capacity
+ORDER BY OccupancyPct DESC;`,
+
+    "alerts": `SELECT 
+    w.WarehouseName, p.ProductName, p.Category, 
+    i.Quantity AS CurrentStock, i.MinimumStock,
+    (i.MinimumStock - i.Quantity) AS DeficitUnits
+FROM inventory i
+JOIN products p ON i.ProductID = p.ProductID
+JOIN warehouses w ON i.WarehouseID = w.WarehouseID
+WHERE i.Quantity <= i.MinimumStock
+ORDER BY DeficitUnits DESC;`,
+
+    "deadstock": `SELECT 
+    p.ProductID, p.ProductName, p.Category, p.UnitPrice, s.SupplierName
+FROM products p
+JOIN suppliers s ON p.SupplierID = s.SupplierID
+WHERE NOT EXISTS (
+    SELECT 1 FROM sales_order_items soi WHERE soi.ProductID = p.ProductID
+);`,
+
+    "tables": `SELECT name AS TableName, type AS ObjectType 
+FROM sqlite_master 
+WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' 
+ORDER BY type, name;`
+};
+
+function setSQLTemplate(type) {
+    const input = document.getElementById("sql-query-input");
+    if (input && SQL_TEMPLATES[type]) {
+        input.value = SQL_TEMPLATES[type];
+        runLiveSQLQuery();
+    }
+}
+
+function clearSQLConsole() {
+    const input = document.getElementById("sql-query-input");
+    if (input) input.value = "";
+    const thead = document.getElementById("sql-results-thead");
+    const tbody = document.getElementById("sql-results-tbody");
+    const metrics = document.getElementById("sql-result-metrics");
+    const status = document.getElementById("sql-status-indicator");
+    if (thead) thead.innerHTML = "<tr><th>Result</th></tr>";
+    if (tbody) tbody.innerHTML = "<tr><td style='text-align:center; color:var(--text-muted); padding:30px;'>Query cleared. Type a new query above.</td></tr>";
+    if (metrics) metrics.innerText = "0 rows";
+    if (status) status.innerHTML = "Press <strong>Execute Query</strong> or <strong>Ctrl + Enter</strong> to run.";
+}
+
+function runLiveSQLQuery() {
+    const input = document.getElementById("sql-query-input");
+    const status = document.getElementById("sql-status-indicator");
+    const metrics = document.getElementById("sql-result-metrics");
+    const thead = document.getElementById("sql-results-thead");
+    const tbody = document.getElementById("sql-results-tbody");
+    const btn = document.getElementById("btn-run-sql");
+
+    if (!input) return;
+    const sql = input.value.trim();
+    if (!sql) {
+        if (status) status.innerHTML = "<span style='color:var(--error);'>Please enter an SQL query first.</span>";
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+    if (status) status.innerHTML = "<span style='color:var(--accent-cyan);'>Executing query against database...</span>";
+
+    fetch("/api/sql/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sql })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (btn) btn.disabled = false;
+        if (data.error) {
+            if (status) status.innerHTML = `<span style='color:var(--error);'>Error: ${data.error}</span>`;
+            if (thead) thead.innerHTML = "<tr><th style='color:var(--error);'>SQL Error</th></tr>";
+            if (tbody) tbody.innerHTML = `<tr><td style='color:var(--error); padding:20px; font-family:monospace;'>${data.error}</td></tr>`;
+            if (metrics) metrics.innerText = "Execution failed";
+            return;
+        }
+
+        if (status) status.innerHTML = `<span style='color:var(--success);'>Execution successful in ${data.elapsed_ms} ms (${data.row_count} rows).</span>`;
+        if (metrics) metrics.innerText = `${data.row_count} row${data.row_count !== 1 ? 's' : ''} in ${data.elapsed_ms} ms`;
+
+        // Build Table Header
+        let thHtml = "<tr>";
+        (data.columns || []).forEach(col => {
+            thHtml += `<th>${col}</th>`;
+        });
+        thHtml += "</tr>";
+        if (thead) thead.innerHTML = thHtml;
+
+        // Build Table Body
+        if (!data.rows || data.rows.length === 0) {
+            if (tbody) tbody.innerHTML = "<tr><td colspan='100%' style='text-align:center; color:var(--text-muted); padding:20px;'>0 records matched query.</td></tr>";
+            return;
+        }
+
+        let tbHtml = "";
+        data.rows.forEach(row => {
+            tbHtml += "<tr>";
+            row.forEach(cell => {
+                const val = cell === null ? "<span style='color:var(--text-muted); font-style:italic;'>NULL</span>" : cell;
+                tbHtml += `<td>${val}</td>`;
+            });
+            tbHtml += "</tr>";
+        });
+        if (tbody) tbody.innerHTML = tbHtml;
+        refreshIcons();
+    })
+    .catch(err => {
+        if (btn) btn.disabled = false;
+        if (status) status.innerHTML = `<span style='color:var(--error);'>Network error: ${err.message}</span>`;
     });
 }
