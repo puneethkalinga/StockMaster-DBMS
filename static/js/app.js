@@ -21,15 +21,20 @@ let selectedWarehouse = "all";
 let filterLowStockOnly = false;
 let currentUser = null;
 
-// Safe Lucide icon rendering wrapper
+// Safe Lucide icon rendering wrapper with microtask debouncing
+let iconRefreshTimeout = null;
 function refreshIcons() {
-    if (window.lucide && typeof window.lucide.createIcons === "function") {
-        try {
-            window.lucide.createIcons();
-        } catch (e) {
-            console.warn("Lucide render notice:", e);
+    if (iconRefreshTimeout) return;
+    iconRefreshTimeout = requestAnimationFrame(() => {
+        iconRefreshTimeout = null;
+        if (window.lucide && typeof window.lucide.createIcons === "function") {
+            try {
+                window.lucide.createIcons();
+            } catch (e) {
+                console.warn("Lucide render notice:", e);
+            }
         }
-    }
+    });
 }
 
 // Global initialization on DOM ready
@@ -264,7 +269,9 @@ function initRouter() {
     // 2. Hash change listener for browser back/forward buttons
     window.addEventListener("hashchange", () => {
         const hash = window.location.hash.replace("#", "") || "dashboard";
-        navigateTo(hash, false);
+        if (hash !== activeView) {
+            navigateTo(hash, false);
+        }
     });
 
     // 3. Initial route resolution
@@ -301,7 +308,7 @@ function navigateTo(viewName, updateHash = true) {
     });
 
     if (updateHash && window.location.hash !== `#${viewName}`) {
-        window.location.hash = viewName;
+        history.replaceState(null, "", `#${viewName}`);
     }
 
     updateHeader();
@@ -470,45 +477,51 @@ function openModal(type) {
         fetch("/api/suppliers").then(res => res.json()).then(data => {
             const s = document.getElementById("prod-supplier");
             if (s) {
-                s.innerHTML = "";
-                data.forEach(x => s.innerHTML += `<option value="${x.SupplierID}">${x.SupplierName}</option>`);
+                let html = "";
+                data.forEach(x => html += `<option value="${x.SupplierID}">${x.SupplierName}</option>`);
+                s.innerHTML = html;
             }
         });
     } else if (type === "po") {
         fetch("/api/suppliers").then(res => res.json()).then(data => {
             const s = document.getElementById("po-supplier");
             if (s) {
-                s.innerHTML = "";
-                data.forEach(x => s.innerHTML += `<option value="${x.SupplierID}">${x.SupplierName}</option>`);
+                let html = "";
+                data.forEach(x => html += `<option value="${x.SupplierID}">${x.SupplierName}</option>`);
+                s.innerHTML = html;
             }
         });
         fetch("/api/products").then(res => res.json()).then(data => {
             const p = document.getElementById("po-product");
             if (p) {
-                p.innerHTML = "";
-                data.forEach(x => p.innerHTML += `<option value="${x.ProductID}">${x.ProductName} (₹${x.UnitPrice.toFixed(2)})</option>`);
+                let html = "";
+                data.forEach(x => html += `<option value="${x.ProductID}">${x.ProductName} (₹${x.UnitPrice.toFixed(2)})</option>`);
+                p.innerHTML = html;
             }
         });
         fetch("/api/warehouses").then(res => res.json()).then(data => {
             const w = document.getElementById("po-warehouse");
             if (w) {
-                w.innerHTML = "";
-                data.forEach(x => w.innerHTML += `<option value="${x.WarehouseID}">${x.WarehouseName}</option>`);
+                let html = "";
+                data.forEach(x => html += `<option value="${x.WarehouseID}">${x.WarehouseName}</option>`);
+                w.innerHTML = html;
             }
         });
     } else if (type === "so") {
         fetch("/api/products").then(res => res.json()).then(data => {
             const p = document.getElementById("so-product");
             if (p) {
-                p.innerHTML = "";
-                data.forEach(x => p.innerHTML += `<option value="${x.ProductID}">${x.ProductName} (₹${x.UnitPrice.toFixed(2)})</option>`);
+                let html = "";
+                data.forEach(x => html += `<option value="${x.ProductID}">${x.ProductName} (₹${x.UnitPrice.toFixed(2)})</option>`);
+                p.innerHTML = html;
             }
         });
         fetch("/api/warehouses").then(res => res.json()).then(data => {
             const w = document.getElementById("so-warehouse");
             if (w) {
-                w.innerHTML = "";
-                data.forEach(x => w.innerHTML += `<option value="${x.WarehouseID}">${x.WarehouseName}</option>`);
+                let html = "";
+                data.forEach(x => html += `<option value="${x.WarehouseID}">${x.WarehouseName}</option>`);
+                w.innerHTML = html;
             }
         });
     }
@@ -528,10 +541,11 @@ function loadWarehouseFilter() {
     fetch("/api/warehouses")
         .then(res => res.json())
         .then(warehouses => {
-            globalWarehouseFilter.innerHTML = '<option value="all">All Warehouses</option>';
+            let html = '<option value="all">All Warehouses</option>';
             warehouses.forEach(w => {
-                globalWarehouseFilter.innerHTML += `<option value="${w.WarehouseID}">${w.WarehouseName}</option>`;
+                html += `<option value="${w.WarehouseID}">${w.WarehouseName}</option>`;
             });
+            globalWarehouseFilter.innerHTML = html;
             if (selectedWarehouse) {
                 globalWarehouseFilter.value = selectedWarehouse;
             }
@@ -611,9 +625,9 @@ function loadDashboard() {
 
             const list = document.getElementById("activity-feed-list");
             if (list) {
-                list.innerHTML = "";
+                let itemsHtml = "";
                 (data.recent_activities || []).forEach(act => {
-                    list.innerHTML += `
+                    itemsHtml += `
                         <li class="activity-item">
                             <div class="activity-icon"><i data-lucide="activity"></i></div>
                             <div class="activity-details">
@@ -623,6 +637,7 @@ function loadDashboard() {
                         </li>
                     `;
                 });
+                list.innerHTML = itemsHtml;
             }
 
             loadForecasting();
@@ -639,12 +654,12 @@ function loadForecasting() {
     fetch("/api/analytics/forecasting")
         .then(res => res.json())
         .then(items => {
-            body.innerHTML = "";
             if (!items || items.length === 0) {
                 body.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">No product velocity data available yet.</td></tr>`;
                 return;
             }
 
+            let html = "";
             items.forEach(f => {
                 let badgeClass = "badge-green";
                 let badgeIcon = "check-circle";
@@ -659,7 +674,7 @@ function loadForecasting() {
                 const safeName = (f.ProductName || "").replace(/'/g, "\\'");
                 const autoDraftBtn = `<button class="btn btn-primary btn-small" onclick="autoDraftPO(${f.ProductID}, '${safeName}', ${f.SupplierID}, ${f.SuggestedQty}, ${f.UnitPrice})" style="white-space:nowrap;"><i data-lucide="shopping-cart"></i> Auto-Draft PO</button>`;
 
-                body.innerHTML += `
+                html += `
                     <tr>
                         <td><strong>${f.ProductName}</strong></td>
                         <td><span class="badge badge-gray">${f.Category}</span></td>
@@ -672,6 +687,7 @@ function loadForecasting() {
                     </tr>
                 `;
             });
+            body.innerHTML = html;
             refreshIcons();
         })
         .catch(err => {
@@ -702,9 +718,9 @@ function loadProducts() {
         .then(products => {
             const body = document.getElementById("products-table-body");
             if (!body) return;
-            body.innerHTML = "";
+            let html = "";
             products.forEach(p => {
-                body.innerHTML += `
+                html += `
                     <tr>
                         <td><code>PRD-${p.ProductID}</code></td>
                         <td><strong>${p.ProductName}</strong></td>
@@ -714,6 +730,7 @@ function loadProducts() {
                     </tr>
                 `;
             });
+            body.innerHTML = html;
             refreshIcons();
         })
         .catch(err => console.error("Products error:", err));
@@ -727,7 +744,6 @@ function loadInventory() {
         .then(inventory => {
             const body = document.getElementById("inventory-table-body");
             if (!body) return;
-            body.innerHTML = "";
 
             let filtered = inventory;
             if (filterLowStockOnly) {
@@ -739,9 +755,10 @@ function loadInventory() {
                 return;
             }
 
+            let html = "";
             filtered.forEach(i => {
                 const isLow = i.Quantity <= i.MinimumStock;
-                body.innerHTML += `
+                html += `
                     <tr>
                         <td><strong>${i.WarehouseName}</strong></td>
                         <td>${i.ProductName}</td>
@@ -752,6 +769,7 @@ function loadInventory() {
                     </tr>
                 `;
             });
+            body.innerHTML = html;
             refreshIcons();
         })
         .catch(err => console.error("Inventory error:", err));
@@ -765,12 +783,12 @@ function loadSubView(sub) {
             .then(orders => {
                 const body = document.getElementById("po-table-body");
                 if (!body) return;
-                body.innerHTML = "";
+                let html = "";
                 orders.forEach(o => {
                     const action = o.Status === "Pending" 
                         ? `<button class="btn btn-amber btn-small" onclick="receivePO(${o.PurchaseOrderID})">Mark Received</button>` 
                         : `<span style="color:var(--text-muted); font-style:italic;">Received</span>`;
-                    body.innerHTML += `
+                    html += `
                         <tr>
                             <td><code>PO-${o.PurchaseOrderID}</code></td>
                             <td><strong>${o.SupplierName}</strong></td>
@@ -784,6 +802,7 @@ function loadSubView(sub) {
                         </tr>
                     `;
                 });
+                body.innerHTML = html;
                 refreshIcons();
             });
     } else if (sub === "sales") {
@@ -792,9 +811,9 @@ function loadSubView(sub) {
             .then(orders => {
                 const body = document.getElementById("sales-table-body");
                 if (!body) return;
-                body.innerHTML = "";
+                let html = "";
                 orders.forEach(o => {
-                    body.innerHTML += `
+                    html += `
                         <tr>
                             <td><code>SO-${o.SalesOrderID}</code></td>
                             <td><strong>${o.CustomerName}</strong></td>
@@ -807,6 +826,7 @@ function loadSubView(sub) {
                         </tr>
                     `;
                 });
+                body.innerHTML = html;
                 refreshIcons();
             });
     } else if (sub === "shipments") {
@@ -815,13 +835,13 @@ function loadSubView(sub) {
             .then(shipments => {
                 const body = document.getElementById("shipments-table-body");
                 if (!body) return;
-                body.innerHTML = "";
+                let html = "";
                 shipments.forEach(s => {
                     const isDelivered = s.Status === "Delivered";
                     const action = isDelivered 
                         ? `<span style="color:var(--text-muted); font-style:italic;">Concluded</span>` 
                         : `<button class="btn btn-amber btn-small" onclick="progressShipment(${s.ShipmentID}, '${s.Status}')">Progress Status</button>`;
-                    body.innerHTML += `
+                    html += `
                         <tr>
                             <td><code>SH-${s.ShipmentID}</code></td>
                             <td><code>SO-${s.SalesOrderID}</code></td>
@@ -832,6 +852,7 @@ function loadSubView(sub) {
                         </tr>
                     `;
                 });
+                body.innerHTML = html;
                 refreshIcons();
             });
     } else if (sub === "billing") {
@@ -840,9 +861,9 @@ function loadSubView(sub) {
             .then(billing => {
                 const body = document.getElementById("billing-table-body");
                 if (!body) return;
-                body.innerHTML = "";
+                let html = "";
                 billing.forEach(b => {
-                    body.innerHTML += `
+                    html += `
                         <tr>
                             <td><code>INV-${b.BillID}</code></td>
                             <td><code>SO-${b.SalesOrderID}</code></td>
@@ -853,6 +874,7 @@ function loadSubView(sub) {
                         </tr>
                     `;
                 });
+                body.innerHTML = html;
                 refreshIcons();
             });
     }
@@ -913,11 +935,11 @@ function loadReports() {
 
             const body = document.getElementById("report-warehouse-summary-body");
             if (body && data.warehouses_utilization) {
-                body.innerHTML = "";
+                let html = "";
                 data.warehouses_utilization.forEach(wh => {
                     const usage = wh.current_stock * 10;
                     const pct = Math.min(Math.round((usage / wh.capacity_sqft) * 100), 100);
-                    body.innerHTML += `
+                    html += `
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
                             <td><strong>${wh.name}</strong></td>
                             <td style="text-align:right;">${wh.capacity_sqft.toLocaleString()} SqFt</td>
@@ -926,6 +948,7 @@ function loadReports() {
                         </tr>
                     `;
                 });
+                body.innerHTML = html;
             }
             refreshIcons();
         });
